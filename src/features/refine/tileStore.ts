@@ -105,11 +105,18 @@ export class TileStore {
     this.emit()
   }
 
+  /** Se llama al montar (StrictMode monta → desmonta → monta: hay que poder reactivar). */
+  activate() {
+    this.disposed = false
+    this.pump()
+  }
+
+  /** Al desmontar: cancela todo lo pendiente. La caché se conserva. */
   dispose() {
     this.disposed = true
-    for (const job of this.jobs.values()) this.cancel(job)
+    for (const job of [...this.jobs.values()]) this.cancel(job)
     if (this.timer) clearTimeout(this.timer)
-    this.listeners.clear()
+    this.timer = null
   }
 
   private cancel(job: Job) {

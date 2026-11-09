@@ -80,7 +80,10 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
   const [sp, setSp] = useSearchParams()
 
   const store = useMemo(() => new TileStore(file.id), [file.id])
-  useEffect(() => () => store.dispose(), [store])
+  useEffect(() => {
+    store.activate()
+    return () => store.dispose()
+  }, [store])
   useSyncExternalStore(store.subscribe, store.getVersion)
 
   // ---------- posición inicial desde ?r=&c= (saneada) ----------
@@ -508,7 +511,7 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
           aria-multiselectable="true"
           onScroll={onScroll}
           onKeyDown={onKeyDown}
-          className="relative h-[70vh] flex-1 overflow-auto rounded border border-slate-700 bg-slate-950"
+          className="relative h-[70vh] min-w-0 shrink-0 overflow-auto rounded border border-slate-700 bg-slate-950 lg:flex-1"
         >
           <div role="presentation" className="relative" style={{ height: rows * CELL, width: cols * CELL }}>
             {rowEls}
