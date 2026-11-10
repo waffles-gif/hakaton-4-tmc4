@@ -9,7 +9,8 @@ import {
 import { ApiError, apiResponse, backoffMs, getJson, isRetryable, sleep } from './http'
 import { TileStore } from './tileStore'
 import { onEvent } from '../events/eventBus'
-import { FloorPanel } from '../floor/FloorPanel'
+import { CursorsLayer, FloorPanel, useFloor } from '../floor/FloorPanel'
+import { useAuth } from '../../lib/auth'
 import { BINS, type Bin, type Cell, type LumonFile, type Progress, type RefineResult, type Rules } from './types'
 
 const CELL = 24 // px
@@ -80,6 +81,18 @@ function clamp(n: number, lo: number, hi: number) {
 function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
   const { rows, cols, tileSize } = file
   const [sp, setSp] = useSearchParams()
+
+  const floor = useFloor(file.id)
+  const myId = useAuth().me?.id
+  /** celda → quién la tiene reservada (solo reservas de OTROS usuarios). */
+  const claimedByOther = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const cl of floor.claims.values()) {
+      if (cl.userId === myId) continue
+      for (const x of cl.cells) m.set(cellKey(x.r, x.c), cl.displayName)
+    }
+    return m
+  }, [floor.claims, myId])
 
   const store = useMemo(() => new TileStore(file.id), [file.id])
   useEffect(() => {
@@ -231,6 +244,11 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
       return
     }
     const cells = selection.group.cells
+    const holderNow = cells.map((x) => claimedByOther.get(cellKey(x.r, x.c))).find(Boolean)
+    if (holderNow) {
+      setMessage({ text: `${holderNow} tiene reservado ese grupo. Espera a que lo libere o elige otro.`, error: true })
+      return
+    }
     const sig = `${bin}|${cells.map((x) => cellKey(x.r, x.c)).sort().join(',')}`
     if (inFlight.current === sig) return // doble clic / doble Enter: misma intención en curso
     let key = intentKeys.current.get(sig)
@@ -240,6 +258,17 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
     }
     inFlight.current = sig
     setSending(true)
+    // Antes de llevar el grupo a una caja, se reserva en el piso compartido (si está conectado).
+    if (floor.state === 'open') {
+      const first = cells[0]!
+      const cr = await floor.claim(first.r, first.c)
+      if (!cr.ok && cr.reason === 'HELD') {
+        inFlight.current = null
+        setSending(false)
+        setMessage({ text: `${cr.holder ?? 'Otro refinador'} tiene reservado ese grupo. Elige otro.`, error: true })
+        return
+      }
+    }
     setMessage({ text: `Enviando el grupo a ${BIN_NAME[bin]}…`, error: false })
     const body = { bin, cells }
 
@@ -293,6 +322,7 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
     }
 
     function handleRefineError(err: ApiError) {
+      floor.release() // no se refinó: liberar la reserva
       const d = (err.details ?? {}) as Record<string, unknown>
       if (err.code === 'ALREADY_REFINED') {
         const tiles = Array.isArray(d.tiles) ? (d.tiles as Array<[number, number]>) : []
@@ -319,7 +349,13 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
         setMessage({ text: err.message || 'Error al refinar.', error: true })
       }
     }
-  }, [selection, file.id, store, tileSize])
+  }, [selection, file.id, store, tileSize, floor, claimedByOther])
+
+  // Cursor propio al piso (throttle 10/s dentro de sendCursor; nada con la pestaña oculta).
+  useEffect(() => {
+    floor.sendCursor(focus.r, focus.c)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus])
 
   // ---------- eventos en tiempo real (CP5): la grilla refleja lo que refinan otros ----------
   useEffect(() => {
@@ -474,6 +510,7 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
     const info = cellFromTile(tile, r, c)
     const scary = isScary(info.tremor, rules)
     const selected = selectedSet.has(cellKey(r, c))
+    const heldBy = claimedByOther.get(cellKey(r, c))
     if (scary && info.bin === '.') {
       style['--a'] = `${(info.tremor / 100) * 1.5}px`
       style['--d'] = `${Math.max(0.15, 1.1 - info.tremor / 100)}s`
@@ -484,7 +521,8 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
         role="gridcell"
         aria-colindex={c + 1}
         aria-selected={selected}
-        aria-label={`${info.value}${scary ? ', da miedo' : ''}${info.bin !== '.' ? `, en caja ${info.bin}` : ''}`}
+        aria-label={`${info.value}${scary ? ', da miedo' : ''}${info.bin !== '.' ? `, en caja ${info.bin}` : ''}${heldBy ? `, reservado por ${heldBy}` : ''}`}
+        title={heldBy ? `Reservado por ${heldBy}` : undefined}
         data-cell={`${r}:${c}`}
         tabIndex={isFocus ? 0 : -1}
         onFocus={() => !isFocus && setFocus({ r, c })}
@@ -495,6 +533,7 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
         className={[
           'absolute top-0 flex select-none items-center justify-center font-mono text-xs cursor-pointer',
           info.bin !== '.' ? BIN_COLOR[info.bin] ?? '' : scary ? 'mdr-scary text-teal-200' : 'text-slate-400',
+          heldBy ? 'bg-fuchsia-950 outline outline-1 -outline-offset-1 outline-dashed outline-fuchsia-400' : '',
           selected ? 'outline outline-2 -outline-offset-2 outline-yellow-300 bg-yellow-900/40' : '',
           isFocus ? 'ring-2 ring-inset ring-white' : '',
         ].join(' ')}
@@ -543,11 +582,12 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
         >
           <div role="presentation" className="relative" style={{ height: rows * CELL, width: cols * CELL }}>
             {rowEls}
+            <CursorsLayer floor={floor} myId={myId} cell={CELL} range={{ r0, r1, c0, c1 }} />
           </div>
         </div>
 
         <aside className="flex w-full flex-col gap-3 lg:w-72" aria-label="Grupo y cajas">
-          <FloorPanel fileId={file.id} />
+          <FloorPanel floor={floor} myId={myId} range={{ r0, r1, c0, c1 }} onGoTo={(r, c) => moveFocus(r, c)} />
           <section className="rounded border border-slate-700 p-3" aria-live="polite">
             <h2 className="mb-1 font-semibold">Grupo seleccionado</h2>
             {selection.kind === 'none' && <p className="text-sm text-slate-400">Haz clic o pulsa Enter sobre un número que tiemble.</p>}
