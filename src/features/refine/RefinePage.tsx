@@ -9,6 +9,7 @@ import {
 import { ApiError, apiResponse, backoffMs, getJson, isRetryable, sleep } from './http'
 import { TileStore } from './tileStore'
 import { onEvent } from '../events/eventBus'
+import { FloorPanel } from '../floor/FloorPanel'
 import { BINS, type Bin, type Cell, type LumonFile, type Progress, type RefineResult, type Rules } from './types'
 
 const CELL = 24 // px
@@ -546,6 +547,7 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
         </div>
 
         <aside className="flex w-full flex-col gap-3 lg:w-72" aria-label="Grupo y cajas">
+          <FloorPanel fileId={file.id} />
           <section className="rounded border border-slate-700 p-3" aria-live="polite">
             <h2 className="mb-1 font-semibold">Grupo seleccionado</h2>
             {selection.kind === 'none' && <p className="text-sm text-slate-400">Haz clic o pulsa Enter sobre un número que tiemble.</p>}
