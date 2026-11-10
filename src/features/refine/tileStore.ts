@@ -105,6 +105,12 @@ export class TileStore {
     this.emit()
   }
 
+  /** stream.reset: tirar toda la caché (la vista vuelve a pedir lo visible). */
+  clearCache() {
+    this.tiles.clear()
+    this.emit()
+  }
+
   /** Se llama al montar (StrictMode monta → desmonta → monta: hay que poder reactivar). */
   activate() {
     this.disposed = false

@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router'
+import { ContingencyModal, EventsIndicator } from '../features/events/EventsUI'
 import { useAuth } from '../lib/auth'
 import type { Permission } from '../lib/types'
 
@@ -26,6 +27,7 @@ export function Layout() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-3 text-sm">
+          <EventsIndicator />
           {me && (
             <span className="text-slate-300">
               {me.displayName} · {me.team.code} · {me.role.name}
@@ -41,6 +43,7 @@ export function Layout() {
         </div>
       </header>
       <Outlet />
+      <ContingencyModal />
     </div>
   )
 }

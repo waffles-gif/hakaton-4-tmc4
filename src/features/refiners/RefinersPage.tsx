@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useAuth } from '../../lib/auth'
 import { ApiError, getJson } from '../refine/http'
-import { safeHttpUrl, type Department, type RefinerPage } from './types'
+import { onEvent } from '../events/eventBus'
+import { safeHttpUrl, type Department, type Refiner, type RefinerPage } from './types'
 
 const SIZES = [10, 25, 50] as const
 
@@ -80,6 +81,27 @@ export default function RefinersPage() {
   }
   useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current) }, [])
 
+  // Eventos (CP5): un expediente actualizado se refleja sin recargar; versión vieja nunca pisa a una nueva.
+  const [reloadTick, setReloadTick] = useState(0)
+  useEffect(() => {
+    const offU = onEvent('refiner.updated', (e) => {
+      const d = e.data as { id?: number; version?: number; refiner?: Refiner } | null
+      const fresh = d?.refiner
+      if (!fresh) return
+      setData((prev) =>
+        prev && {
+          ...prev,
+          content: prev.content.map((r) => (r.id === fresh.id && fresh.version > r.version ? fresh : r)),
+        },
+      )
+    })
+    const offR = onEvent('stream.reset', () => setReloadTick((t) => t + 1))
+    return () => {
+      offU()
+      offR()
+    }
+  }, [])
+
   // Una respuesta vieja nunca pisa a una nueva: se aborta la anterior.
   useEffect(() => {
     const ctrl = new AbortController()
@@ -105,7 +127,7 @@ export default function RefinersPage() {
       })
     return () => ctrl.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey])
+  }, [queryKey, reloadTick])
 
   const canEdit = can('refiners:write')
 

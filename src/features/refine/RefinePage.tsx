@@ -8,7 +8,8 @@ import {
 } from './gridLogic'
 import { ApiError, apiResponse, backoffMs, getJson, isRetryable, sleep } from './http'
 import { TileStore } from './tileStore'
-import { BINS, type Bin, type LumonFile, type Progress, type RefineResult, type Rules } from './types'
+import { onEvent } from '../events/eventBus'
+import { BINS, type Bin, type Cell, type LumonFile, type Progress, type RefineResult, type Rules } from './types'
 
 const CELL = 24 // px
 const MAX_DOM_CELLS = 2500
@@ -163,11 +164,12 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
   const tr1 = Math.floor(Math.max(r0, r1 - 1) / tileSize)
   const tc0 = Math.floor(c0 / tileSize)
   const tc1 = Math.floor(Math.max(c0, c1 - 1) / tileSize)
+  const [resetTick, setResetTick] = useState(0)
   useEffect(() => {
     const keys: Array<[number, number]> = []
     for (let tr = tr0; tr <= tr1; tr++) for (let tc = tc0; tc <= tc1; tc++) keys.push([tr, tc])
     store.want(keys)
-  }, [store, tr0, tr1, tc0, tc1])
+  }, [store, tr0, tr1, tc0, tc1, resetTick])
 
   // ---------- selección de grupo ----------
   const [selection, setSelection] = useState<Selection>({ kind: 'none' })
@@ -317,6 +319,31 @@ function RefineGrid({ file, rules }: { file: LumonFile; rules: Rules }) {
       }
     }
   }, [selection, file.id, store, tileSize])
+
+  // ---------- eventos en tiempo real (CP5): la grilla refleja lo que refinan otros ----------
+  useEffect(() => {
+    const offs = [
+      onEvent('refinement.created', (e) => {
+        const d = e.data as { fileId?: number; cells?: Cell[]; bin?: Bin; progress?: Progress } | null
+        if (!d || d.fileId !== file.id || !d.cells || !d.bin) return
+        store.markBins(d.cells, BIN_CHAR[d.bin], tileSize)
+        if (d.progress) setProgress(d.progress)
+        setSelection((s) =>
+          s.kind === 'group' && s.group.cells.some((c) => d.cells!.some((x) => x.r === c.r && x.c === c.c))
+            ? { kind: 'none' }
+            : s,
+        )
+      }),
+      onEvent('file.completed', (e) => {
+        if ((e.data as { fileId?: number } | null)?.fileId === file.id) setStats((s) => ({ ...s, status: 'COMPLETE' }))
+      }),
+      onEvent('stream.reset', () => {
+        store.clearCache()
+        setResetTick((t) => t + 1)
+      }),
+    ]
+    return () => offs.forEach((off) => off())
+  }, [file.id, store, tileSize])
 
   // ---------- teclado ----------
   const moveFocus = (r: number, c: number) => {

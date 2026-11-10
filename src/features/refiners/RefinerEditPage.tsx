@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import { fieldErrors } from '../../lib/api'
 import { ApiError, apiResponse, backoffMs, getJson, isRetryable, sleep } from '../refine/http'
+import { onEvent } from '../events/eventBus'
 import type { Department, Refiner, RefinerPatch } from './types'
 
 // Regla de Milchick: PATCH siempre con el ETag exacto leído. Ante 412 se muestra el conflicto
@@ -113,6 +114,21 @@ export default function RefinerEditPage() {
     return () => ctrl.abort()
   }, [validId, load])
 
+  // Si mientras se edita llega un refiner.updated de este expediente, se avisa ANTES de guardar.
+  const [remoteVersion, setRemoteVersion] = useState<number | null>(null)
+  useEffect(() => {
+    const offU = onEvent('refiner.updated', (e) => {
+      const d = e.data as { id?: number; version?: number; updatedBy?: { displayName?: string } } | null
+      if (d?.id !== refinerId || typeof d.version !== 'number') return
+      if (d.version > versionRef.current) setRemoteVersion(d.version)
+    })
+    const offR = onEvent('stream.reset', () => setRemoteVersion((v) => v ?? versionRef.current + 1))
+    return () => {
+      offU()
+      offR()
+    }
+  }, [refinerId])
+
   async function send(patch: RefinerPatch, ifMatch: string, mine: Form, base: Refiner) {
     setSaving(true)
     setMessage(null)
@@ -204,6 +220,23 @@ export default function RefinerEditPage() {
       <Link to="/refiners" className="text-sm underline">← Directorio</Link>
       <h1 className="mt-1 text-2xl font-semibold">Editar expediente: {refiner.fullName}</h1>
       <p className="text-xs text-slate-400">Versión {refiner.version}</p>
+
+      {remoteVersion !== null && remoteVersion > refiner.version && !conflict && (
+        <div role="alert" className="mt-3 rounded border border-amber-600 bg-amber-950/40 p-3 text-sm">
+          Alguien cambió este expediente mientras lo editabas (versión {remoteVersion}). Si guardas ahora verás
+          el conflicto campo por campo; también puedes recargar y perder tus cambios.
+          <button
+            type="button"
+            onClick={() => {
+              setRemoteVersion(null)
+              void load()
+            }}
+            className="ml-2 underline"
+          >
+            Recargar
+          </button>
+        </div>
+      )}
 
       {conflict ? (
         <section role="alertdialog" aria-labelledby="conf-title" className="mt-4 rounded border border-amber-600 bg-amber-950/40 p-4">
