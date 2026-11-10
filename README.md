@@ -1,3 +1,60 @@
+# Consola MDR — Cuadrilla tamymafer (TEAM-050)
+
+## Integrantes
+
+| Nombre | Código |
+|:--|:--|
+| Tamara Iberico Gomez | 202510302 |
+| Maria Fernanda Carbajal Cortez | 202510228 |
+| Tamara Gomez | PROVISIONAL-01 |
+
+## Producción
+
+- **URL:** https://hakaton-4-tmc4.vercel.app
+- **Repositorio:** https://github.com/waffles-gif/hakaton-4-tmc4
+- **TEAM_CODE:** TEAM-050
+
+## Cómo ejecutar
+
+Requisitos: Node 24 LTS y npm.
+
+```bash
+npm install
+cp .env.example .env   # y completar los valores
+npm run dev            # http://localhost:5173
+npm run build          # build de producción en dist/
+```
+
+Variables de entorno (todas `VITE_*`, ver `.env.example`):
+
+| Variable | Valor |
+|:--|:--|
+| `VITE_API_BASE_URL` | `https://lumon-api.vercel.app/api/v1` |
+| `VITE_WS_BASE_URL` | `wss://lumon-api.vercel.app/api/v1` |
+| `VITE_CLOUDINARY_CLOUD_NAME` | cloud name de Cloudinary (público) |
+| `VITE_CLOUDINARY_UPLOAD_PRESET` | nombre del preset unsigned |
+
+## Despliegue (Vercel)
+
+- Proyecto de Vercel conectado al repositorio: cada push a `main` despliega en producción.
+- Preset de framework: Vite (`npm run build`, salida `dist`). Las variables `VITE_*` se configuran en
+  *Settings → Environment Variables*.
+- `X-Lumon-Build`: `vite.config.ts` inyecta en tiempo de build el SHA corto (7) del commit desplegado
+  (`VERCEL_GIT_COMMIT_SHA`); en `npm run dev` vale `dev`.
+- `vercel.json`: rewrite de SPA a `index.html` (excepto `/.well-known/`, que se sirve como texto) y
+  cabeceras `Content-Security-Policy`, `X-Content-Type-Options: nosniff` y `Referrer-Policy`.
+- Dominio verificado con `POST /integrations/deploy/challenge` + `public/.well-known/lumon-verification.txt`
+  + `POST /integrations/deploy/verify`.
+
+## Storage (Cloudinary)
+
+- Upload preset **unsigned**, carpeta fija `lumon/TEAM-050` (todo `public_id` empieza con `lumon/TEAM-050/`),
+  formato permitido solo `webp`, sin sobrescritura.
+- En el frontend solo van el cloud name y el nombre del preset; nunca el API secret.
+- Registrado y verificado con `PUT /integrations/storage`.
+
+---
+
 # Hackathon Frontend: Lumon Industries — Macrodata Refinement
 
 <div align="center">

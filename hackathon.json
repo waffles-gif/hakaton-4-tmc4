@@ -1,11 +1,11 @@
 {
-  "teamCode": "TEAM-000",
-  "teamName": "Nombre de la cuadrilla",
-  "deployUrl": "https://",
-  "storageProvider": "SUPABASE | CLOUDINARY",
+  "teamCode": "TEAM-050",
+  "teamName": "tamymafer",
+  "deployUrl": "https://hakaton-4-tmc4.vercel.app",
+  "storageProvider": "CLOUDINARY",
   "integrantes": [
-    { "nombre": "Nombre Apellido", "codigo": "CODIGO UTEC" },
-    { "nombre": "Nombre Apellido", "codigo": "CODIGO UTEC" },
-    { "nombre": "Nombre Apellido", "codigo": "CODIGO UTEC" }
+    { "nombre": "Tamara Iberico Gomez", "codigo": "202510302" },
+    { "nombre": "Maria Fernanda Carbajal Cortez", "codigo": "202510228" },
+    { "nombre": "Tamara Gomez", "codigo": "PROVISIONAL-01" }
   ]
 }
