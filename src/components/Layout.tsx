@@ -4,6 +4,7 @@ import type { Permission } from '../lib/types'
 
 const LINKS: { to: string; label: string; perm?: Permission }[] = [
   { to: '/files', label: 'Archivos', perm: 'files:read' },
+  { to: '/refiners', label: 'Expedientes', perm: 'refiners:read' },
   { to: '/estado', label: 'Estado' },
 ]
 

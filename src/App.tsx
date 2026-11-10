@@ -41,6 +41,26 @@ const router = createBrowserRouter([
                   },
                 ],
               },
+              {
+                element: <RequirePermission perm="refiners:read" />,
+                children: [
+                  {
+                    path: '/refiners',
+                    lazy: async () => ({ Component: (await import('./features/refiners/RefinersPage')).default }),
+                  },
+                  {
+                    element: <RequirePermission perm="refiners:write" />,
+                    children: [
+                      {
+                        path: '/refiners/:id/edit',
+                        lazy: async () => ({
+                          Component: (await import('./features/refiners/RefinerEditPage')).default,
+                        }),
+                      },
+                    ],
+                  },
+                ],
+              },
             ],
           },
         ],
