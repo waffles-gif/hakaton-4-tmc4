@@ -57,6 +57,42 @@ const router = createBrowserRouter([
                           Component: (await import('./features/refiners/RefinerEditPage')).default,
                         }),
                       },
+                      {
+                        element: <RequirePermission perm="media:upload" />,
+                        children: [
+                          {
+                            path: '/refiners/:id/badge',
+                            lazy: async () => ({
+                              Component: (await import('./features/media/BadgeEditorPage')).default,
+                            }),
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+              {
+                element: <RequirePermission perm="incidents:read" />,
+                children: [
+                  {
+                    path: '/incidents',
+                    lazy: async () => ({ Component: (await import('./features/media/IncidentsPage')).default }),
+                  },
+                  {
+                    element: <RequirePermission perm="incidents:create" />,
+                    children: [
+                      {
+                        element: <RequirePermission perm="media:upload" />,
+                        children: [
+                          {
+                            path: '/incidents/new',
+                            lazy: async () => ({
+                              Component: (await import('./features/media/IncidentNewPage')).default,
+                            }),
+                          },
+                        ],
+                      },
                     ],
                   },
                 ],

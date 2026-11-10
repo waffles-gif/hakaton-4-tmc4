@@ -228,6 +228,11 @@ export default function RefinersPage() {
                         Editar
                       </Link>
                     )}
+                    {canEdit && can('media:upload') && (
+                      <Link to={`/refiners/${r.id}/badge`} className="underline">
+                        Fotocheck
+                      </Link>
+                    )}
                   </div>
                 </div>
               </li>
